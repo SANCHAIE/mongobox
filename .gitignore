@@ -1,0 +1,17 @@
+# Arduino / PlatformIO
+build/
+.pio/
+*.hex
+*.bin
+*.elf
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Office temp
+~$*

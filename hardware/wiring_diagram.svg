@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 980" font-family="Arial, 'Helvetica Neue', sans-serif">
+  <rect x="0" y="0" width="1400" height="980" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="52" font-size="34" font-weight="bold" fill="#2e7d32">MangoBox</text>
+  <text x="220" y="52" font-size="24" fill="#333">— แผนผังการต่อวงจร (Wiring Diagram) ESP32</text>
+  <text x="40" y="82" font-size="16" fill="#777">เซ็นเซอร์ทุกตัว + จอ ต่อขนานบนสาย I2C เส้นเดียว (SDA=GPIO8, SCL=GPIO9) · address ต่างกันจึงไม่ชนกัน</text>
+
+  <!-- ===== Legend ===== -->
+  <g font-size="15">
+    <rect x="1010" y="30" width="350" height="70" rx="8" fill="#f7f7f5" stroke="#ddd"/>
+    <line x1="1025" y1="50" x2="1060" y2="50" stroke="#d64545" stroke-width="4"/><text x="1068" y="55" fill="#333">3V3 (ไฟเลี้ยง)</text>
+    <line x1="1210" y1="50" x2="1245" y2="50" stroke="#333" stroke-width="4"/><text x="1253" y="55" fill="#333">GND (กราวด์)</text>
+    <line x1="1025" y1="80" x2="1060" y2="80" stroke="#2f80ed" stroke-width="4"/><text x="1068" y="85" fill="#333">SDA (ข้อมูล)</text>
+    <line x1="1210" y1="80" x2="1245" y2="80" stroke="#27ae60" stroke-width="4"/><text x="1253" y="85" fill="#333">SCL (สัญญาณนาฬิกา)</text>
+  </g>
+
+  <!-- ===== Rails (horizontal bus) ===== -->
+  <!-- y: VCC 300, SDA 355, SCL 410, GND 465 -->
+  <line x1="300" y1="300" x2="1180" y2="300" stroke="#d64545" stroke-width="4"/>
+  <line x1="300" y1="355" x2="1180" y2="355" stroke="#2f80ed" stroke-width="4"/>
+  <line x1="300" y1="410" x2="1180" y2="410" stroke="#27ae60" stroke-width="4"/>
+  <line x1="300" y1="465" x2="1180" y2="465" stroke="#333"    stroke-width="4"/>
+  <text x="1188" y="305" font-size="14" fill="#d64545" font-weight="bold">3V3</text>
+  <text x="1188" y="360" font-size="14" fill="#2f80ed" font-weight="bold">SDA</text>
+  <text x="1188" y="415" font-size="14" fill="#27ae60" font-weight="bold">SCL</text>
+  <text x="1188" y="470" font-size="14" fill="#333"    font-weight="bold">GND</text>
+
+  <!-- ===== ESP32 board ===== -->
+  <rect x="90" y="250" width="200" height="270" rx="12" fill="#20303a" stroke="#111"/>
+  <text x="190" y="285" font-size="20" fill="#f4c430" font-weight="bold" text-anchor="middle">ESP32-S3</text>
+  <text x="190" y="306" font-size="12" fill="#9fb89f" text-anchor="middle">N16R8 (DevKitC-1)</text>
+  <!-- USB stub -->
+  <rect x="60" y="370" width="32" height="40" rx="4" fill="#555"/>
+  <text x="76" y="432" font-size="11" fill="#777" text-anchor="middle">USB</text>
+  <!-- pins on right edge -->
+  <g font-size="13" fill="#fff">
+    <circle cx="290" cy="300" r="5" fill="#d64545"/><text x="278" y="296" text-anchor="end">3V3</text>
+    <circle cx="290" cy="355" r="5" fill="#2f80ed"/><text x="252" y="351" text-anchor="end">GPIO8</text>
+    <circle cx="290" cy="410" r="5" fill="#27ae60"/><text x="252" y="406" text-anchor="end">GPIO9</text>
+    <circle cx="290" cy="465" r="5" fill="#333" stroke="#fff"/><text x="278" y="461" text-anchor="end">GND</text>
+    <circle cx="290" cy="500" r="5" fill="#e57e25"/><text x="252" y="496" text-anchor="end">GPIO10</text>
+  </g>
+  <!-- ESP32 pins to rails (short taps) -->
+  <line x1="290" y1="300" x2="300" y2="300" stroke="#d64545" stroke-width="4"/>
+  <line x1="290" y1="355" x2="300" y2="355" stroke="#2f80ed" stroke-width="4"/>
+  <line x1="290" y1="410" x2="300" y2="410" stroke="#27ae60" stroke-width="4"/>
+  <line x1="290" y1="465" x2="300" y2="465" stroke="#333"    stroke-width="4"/>
+  <!-- VIN / 5V tap for fan -->
+  <circle cx="290" cy="335" r="5" fill="#f2a900"/><text x="252" y="331" font-size="12" fill="#fff" text-anchor="end">VIN(5V)</text>
+
+  <!-- ===== Module template macro drawn inline for 4 modules ===== -->
+  <!-- Module centers x: 420, 620, 820, 1020 ; box y 120..215 -->
+  <!-- pin x offsets: VCC -45, GND -15, SDA +15, SCL +45 (relative to center) -->
+
+  <!-- Module 1: SGP30 -->
+  <g>
+    <rect x="345" y="120" width="150" height="95" rx="10" fill="#eaf4ec" stroke="#2e7d32" stroke-width="2"/>
+    <text x="420" y="150" font-size="18" font-weight="bold" fill="#2e7d32" text-anchor="middle">SGP30</text>
+    <text x="420" y="172" font-size="12" fill="#555" text-anchor="middle">แก๊ส / VOC</text>
+    <text x="420" y="190" font-size="12" fill="#999" text-anchor="middle">I2C 0x58</text>
+    <!-- pin labels -->
+    <text x="375" y="230" font-size="10" fill="#d64545" text-anchor="middle">VCC</text>
+    <text x="405" y="230" font-size="10" fill="#333"    text-anchor="middle">GND</text>
+    <text x="435" y="230" font-size="10" fill="#2f80ed" text-anchor="middle">SDA</text>
+    <text x="465" y="230" font-size="10" fill="#27ae60" text-anchor="middle">SCL</text>
+    <!-- stubs to rails -->
+    <line x1="375" y1="215" x2="375" y2="300" stroke="#d64545" stroke-width="3"/><circle cx="375" cy="300" r="4" fill="#d64545"/>
+    <line x1="405" y1="215" x2="405" y2="465" stroke="#333"    stroke-width="3"/><circle cx="405" cy="465" r="4" fill="#333"/>
+    <line x1="435" y1="215" x2="435" y2="355" stroke="#2f80ed" stroke-width="3"/><circle cx="435" cy="355" r="4" fill="#2f80ed"/>
+    <line x1="465" y1="215" x2="465" y2="410" stroke="#27ae60" stroke-width="3"/><circle cx="465" cy="410" r="4" fill="#27ae60"/>
+  </g>
+
+  <!-- Module 2: TCS34725 -->
+  <g>
+    <rect x="545" y="120" width="150" height="95" rx="10" fill="#fef7e0" stroke="#e57e25" stroke-width="2"/>
+    <text x="620" y="150" font-size="18" font-weight="bold" fill="#e57e25" text-anchor="middle">TCS34725</text>
+    <text x="620" y="172" font-size="12" fill="#555" text-anchor="middle">สีเปลือก (RGB)</text>
+    <text x="620" y="190" font-size="12" fill="#999" text-anchor="middle">I2C 0x29</text>
+    <text x="575" y="230" font-size="10" fill="#d64545" text-anchor="middle">VCC</text>
+    <text x="605" y="230" font-size="10" fill="#333"    text-anchor="middle">GND</text>
+    <text x="635" y="230" font-size="10" fill="#2f80ed" text-anchor="middle">SDA</text>
+    <text x="665" y="230" font-size="10" fill="#27ae60" text-anchor="middle">SCL</text>
+    <line x1="575" y1="215" x2="575" y2="300" stroke="#d64545" stroke-width="3"/><circle cx="575" cy="300" r="4" fill="#d64545"/>
+    <line x1="605" y1="215" x2="605" y2="465" stroke="#333"    stroke-width="3"/><circle cx="605" cy="465" r="4" fill="#333"/>
+    <line x1="635" y1="215" x2="635" y2="355" stroke="#2f80ed" stroke-width="3"/><circle cx="635" cy="355" r="4" fill="#2f80ed"/>
+    <line x1="665" y1="215" x2="665" y2="410" stroke="#27ae60" stroke-width="3"/><circle cx="665" cy="410" r="4" fill="#27ae60"/>
+  </g>
+
+  <!-- Module 3: BME280 -->
+  <g>
+    <rect x="745" y="120" width="150" height="95" rx="10" fill="#e7f0fb" stroke="#2f80ed" stroke-width="2"/>
+    <text x="820" y="150" font-size="18" font-weight="bold" fill="#2f80ed" text-anchor="middle">BME280</text>
+    <text x="820" y="172" font-size="12" fill="#555" text-anchor="middle">อุณหภูมิ/ความชื้น</text>
+    <text x="820" y="190" font-size="12" fill="#999" text-anchor="middle">I2C 0x76/0x77</text>
+    <text x="775" y="230" font-size="10" fill="#d64545" text-anchor="middle">VCC</text>
+    <text x="805" y="230" font-size="10" fill="#333"    text-anchor="middle">GND</text>
+    <text x="835" y="230" font-size="10" fill="#2f80ed" text-anchor="middle">SDA</text>
+    <text x="865" y="230" font-size="10" fill="#27ae60" text-anchor="middle">SCL</text>
+    <line x1="775" y1="215" x2="775" y2="300" stroke="#d64545" stroke-width="3"/><circle cx="775" cy="300" r="4" fill="#d64545"/>
+    <line x1="805" y1="215" x2="805" y2="465" stroke="#333"    stroke-width="3"/><circle cx="805" cy="465" r="4" fill="#333"/>
+    <line x1="835" y1="215" x2="835" y2="355" stroke="#2f80ed" stroke-width="3"/><circle cx="835" cy="355" r="4" fill="#2f80ed"/>
+    <line x1="865" y1="215" x2="865" y2="410" stroke="#27ae60" stroke-width="3"/><circle cx="865" cy="410" r="4" fill="#27ae60"/>
+  </g>
+
+  <!-- Module 4: OLED -->
+  <g>
+    <rect x="945" y="120" width="150" height="95" rx="10" fill="#f0f0f0" stroke="#555" stroke-width="2"/>
+    <text x="1020" y="150" font-size="18" font-weight="bold" fill="#333" text-anchor="middle">OLED</text>
+    <text x="1020" y="172" font-size="12" fill="#555" text-anchor="middle">จอ SSD1306 0.96"</text>
+    <text x="1020" y="190" font-size="12" fill="#999" text-anchor="middle">I2C 0x3C / 0x3D</text>
+    <text x="975"  y="230" font-size="10" fill="#d64545" text-anchor="middle">VCC</text>
+    <text x="1005" y="230" font-size="10" fill="#333"    text-anchor="middle">GND</text>
+    <text x="1035" y="230" font-size="10" fill="#2f80ed" text-anchor="middle">SDA</text>
+    <text x="1065" y="230" font-size="10" fill="#27ae60" text-anchor="middle">SCL</text>
+    <line x1="975"  y1="215" x2="975"  y2="300" stroke="#d64545" stroke-width="3"/><circle cx="975"  cy="300" r="4" fill="#d64545"/>
+    <line x1="1005" y1="215" x2="1005" y2="465" stroke="#333"    stroke-width="3"/><circle cx="1005" cy="465" r="4" fill="#333"/>
+    <line x1="1035" y1="215" x2="1035" y2="355" stroke="#2f80ed" stroke-width="3"/><circle cx="1035" cy="355" r="4" fill="#2f80ed"/>
+    <line x1="1065" y1="215" x2="1065" y2="410" stroke="#27ae60" stroke-width="3"/><circle cx="1065" cy="410" r="4" fill="#27ae60"/>
+  </g>
+
+  <!-- ===== Fan sub-circuit (inset box) ===== -->
+  <g>
+    <rect x="90" y="590" width="640" height="330" rx="12" fill="#fbfbf9" stroke="#ccc"/>
+    <text x="110" y="622" font-size="18" font-weight="bold" fill="#e57e25">พัดลมกวนอากาศ 5V (ควบคุมด้วยทรานซิสเตอร์)</text>
+    <text x="110" y="646" font-size="13" fill="#777">GPIO10 สั่งเปิด/ปิดพัดลม — พัดลมกินไฟมาก ต่อผ่านทรานซิสเตอร์ ห้ามต่อกับ GPIO ตรง ๆ</text>
+
+    <!-- 5V rail -->
+    <line x1="150" y1="700" x2="620" y2="700" stroke="#f2a900" stroke-width="4"/>
+    <text x="150" y="692" font-size="13" fill="#f2a900" font-weight="bold">VIN / 5V</text>
+    <!-- GND rail -->
+    <line x1="150" y1="880" x2="620" y2="880" stroke="#333" stroke-width="4"/>
+    <text x="150" y="900" font-size="13" fill="#333" font-weight="bold">GND</text>
+
+    <!-- Fan -->
+    <circle cx="400" cy="740" r="34" fill="#e7f0fb" stroke="#2f80ed" stroke-width="2"/>
+    <text x="400" y="746" font-size="14" fill="#2f80ed" text-anchor="middle" font-weight="bold">FAN</text>
+    <line x1="400" y1="700" x2="400" y2="706" stroke="#f2a900" stroke-width="3"/>
+    <line x1="400" y1="774" x2="400" y2="800" stroke="#333" stroke-width="3"/>
+
+    <!-- Flyback diode across fan -->
+    <line x1="470" y1="706" x2="470" y2="800" stroke="#888" stroke-width="2"/>
+    <line x1="400" y1="706" x2="470" y2="706" stroke="#888" stroke-width="2"/>
+    <line x1="400" y1="800" x2="470" y2="800" stroke="#888" stroke-width="2"/>
+    <polygon points="460,760 480,760 470,745" fill="none" stroke="#888" stroke-width="2"/>
+    <line x1="460" y1="745" x2="480" y2="745" stroke="#888" stroke-width="2"/>
+    <text x="490" y="758" font-size="12" fill="#888">ไดโอด 1N4007</text>
+    <text x="490" y="774" font-size="11" fill="#aaa">(flyback กันไฟย้อน)</text>
+
+    <!-- Transistor -->
+    <circle cx="400" cy="825" r="22" fill="#fff" stroke="#333" stroke-width="2"/>
+    <text x="400" y="830" font-size="11" fill="#333" text-anchor="middle">NPN</text>
+    <text x="360" y="812" font-size="11" fill="#555">C</text>
+    <text x="360" y="848" font-size="11" fill="#555">E</text>
+    <line x1="400" y1="847" x2="400" y2="880" stroke="#333" stroke-width="3"/>
+
+    <!-- Base resistor from GPIO10 -->
+    <line x1="200" y1="825" x2="340" y2="825" stroke="#e57e25" stroke-width="3"/>
+    <rect x="250" y="816" width="40" height="18" fill="#fff" stroke="#e57e25"/>
+    <text x="270" y="810" font-size="11" fill="#e57e25" text-anchor="middle">1kΩ</text>
+    <line x1="378" y1="825" x2="340" y2="825" stroke="#333" stroke-width="3"/>
+    <circle cx="200" cy="825" r="5" fill="#e57e25"/>
+    <text x="120" y="830" font-size="13" fill="#e57e25" font-weight="bold">GPIO10</text>
+    <text x="120" y="848" font-size="10" fill="#999">จาก ESP32</text>
+
+    <text x="330" y="908" font-size="11" fill="#999">ทรานซิสเตอร์: 2N2222 / S8050  หรือ MOSFET logic-level (AO3400)</text>
+  </g>
+
+  <!-- ===== Connection table ===== -->
+  <g font-size="13">
+    <rect x="760" y="590" width="600" height="330" rx="12" fill="#fbfbf9" stroke="#ccc"/>
+    <text x="780" y="622" font-size="18" font-weight="bold" fill="#2e7d32">ตารางการต่อสาย (สรุป)</text>
+
+    <line x1="780" y1="640" x2="1340" y2="640" stroke="#ddd"/>
+    <text x="790"  y="665" font-weight="bold" fill="#555">อุปกรณ์</text>
+    <text x="1010" y="665" font-weight="bold" fill="#555">ต่อเข้ากับ ESP32</text>
+    <line x1="780" y1="675" x2="1340" y2="675" stroke="#ddd"/>
+
+    <text x="790" y="700" fill="#333">SGP30 / TCS34725 / BME280 / OLED — VCC</text>
+    <text x="1010" y="700" fill="#d64545">3V3</text>
+    <text x="790" y="728" fill="#333">SGP30 / TCS34725 / BME280 / OLED — GND</text>
+    <text x="1010" y="728" fill="#333">GND</text>
+    <text x="790" y="756" fill="#333">SGP30 / TCS34725 / BME280 / OLED — SDA</text>
+    <text x="1010" y="756" fill="#2f80ed">GPIO8</text>
+    <text x="790" y="784" fill="#333">SGP30 / TCS34725 / BME280 / OLED — SCL</text>
+    <text x="1010" y="784" fill="#27ae60">GPIO9</text>
+    <line x1="780" y1="800" x2="1340" y2="800" stroke="#eee"/>
+    <text x="790" y="828" fill="#333">พัดลม (ผ่านทรานซิสเตอร์) — สัญญาณคุม</text>
+    <text x="1010" y="828" fill="#e57e25">GPIO10</text>
+    <text x="790" y="856" fill="#333">พัดลม — ไฟเลี้ยง (+)</text>
+    <text x="1010" y="856" fill="#f2a900">VIN (5V)</text>
+
+    <rect x="790" y="874" width="540" height="34" rx="6" fill="#eaf4ec"/>
+    <text x="800" y="896" font-size="12" fill="#2e7d32">เคล็ดลับ: I2C คือ "สายเดียวใช้ร่วมกัน" — VCC/GND/SDA/SCL ต่อขนานทุกตัว ใช้ราง (+)/(-) บนเบรดบอร์ด</text>
+  </g>
+</svg>
