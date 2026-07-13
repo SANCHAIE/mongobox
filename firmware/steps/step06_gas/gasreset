@@ -1,0 +1,60 @@
+#include <Wire.h>
+#include <Adafruit_SGP30.h>
+#include <Preferences.h>
+
+#define I2C_SDA 8
+#define I2C_SCL 9
+#define RGB_PIN 48
+#define BRIGHT  10
+
+Adafruit_SGP30 sgp;
+Preferences prefs;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(I2C_SDA, I2C_SCL);
+  Wire.setClock(50000);
+  delay(800);
+
+  // *** ล้าง baseline เก่าทิ้ง (ที่เก็บไว้ตอนปนเปื้อน = ใช้ไม่ได้) ***
+  prefs.begin("mangobox", false);
+  prefs.remove("bTVOC");
+  prefs.remove("bECO2");
+  Serial.println(">>> ล้าง baseline เก่าทิ้งแล้ว <<<");
+
+  if (!sgp.begin()) { Serial.println("[X] ไม่พบ SGP30"); return; }
+  Serial.println("[OK] SGP30 เริ่มใหม่ (ไม่มี baseline)\n");
+  Serial.println("*** วางในอากาศสะอาด ห่างจากโต๊ะบัดกรี ***");
+  Serial.println("*** ดูว่าค่าค่อย ๆ ลดลงไหม (ควรลงมาต่ำกว่า 500 ppb) ***\n");
+  Serial.println("นาที,TVOC_ppb,eCO2_ppm,สถานะ");
+}
+
+void loop() {
+  static unsigned long last = 0;
+  if (millis() - last < 5000) return;      // อ่านทุก 5 วินาที
+  last = millis();
+
+  if (!sgp.IAQmeasure()) return;
+
+  int tvoc = sgp.TVOC;
+  int eco2 = sgp.eCO2;
+  float mins = millis() / 60000.0;
+
+  Serial.print(mins, 1);  Serial.print(',');
+  Serial.print(tvoc);     Serial.print(',');
+  Serial.print(eco2);     Serial.print(',');
+
+  if (tvoc >= 59000) {
+    Serial.println("ตันเพดาน! ยังปนเปื้อนอยู่");
+    neopixelWrite(RGB_PIN, BRIGHT, 0, 0);              // แดง
+  } else if (tvoc > 2000) {
+    Serial.println("สูงมาก กำลังฟื้นตัว...");
+    neopixelWrite(RGB_PIN, BRIGHT, BRIGHT * 0.3, 0);   // ส้ม
+  } else if (tvoc > 500) {
+    Serial.println("ใกล้ปกติแล้ว");
+    neopixelWrite(RGB_PIN, BRIGHT, BRIGHT, 0);         // เหลือง
+  } else {
+    Serial.println("ปกติ! ใช้งานได้แล้ว");
+    neopixelWrite(RGB_PIN, 0, BRIGHT, 0);              // เขียว
+  }
+}
