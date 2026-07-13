@@ -1,0 +1,303 @@
+/* ============================================================================
+   COLOR DASHBOARD — โชว์สีที่เซ็นเซอร์เห็น บนมือถือ
+   ----------------------------------------------------------------------------
+   - แถบสีจริงเต็มจอ + ค่า HEX + แถบ R/G/B + Hue + %ความสุก
+   - กดคาลิเบรตสีขาวได้จากมือถือ (ไม่ต้องเอื้อมไปกดปุ่มบนบอร์ด)
+   - ไฟ RGB บนบอร์ดโชว์สีเดียวกันไปด้วย
+   ----------------------------------------------------------------------------
+   Board = ESP32S3 Dev Module | USB CDC On Boot = Enabled | PSRAM = OPI
+   ขา: SDA=8, SCL=9, RGB=48, ปุ่ม BOOT=0
+   ** WiFi ต้องเป็น 2.4GHz เท่านั้น! ESP32 ต่อ 5GHz ไม่ได้ **
+   ============================================================================ */
+
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Wire.h>
+#include <Adafruit_TCS34725.h>
+#include <Preferences.h>
+
+const char* WIFI_SSID = "Maker_Club_BUU";      // <<< แก้
+const char* WIFI_PASS = "maker1234";               // <<< แก้
+
+#define I2C_SDA 8
+#define I2C_SCL 9
+#define RGB_PIN 48
+#define BRIGHT  25
+#define BTN_PIN 0
+
+#define HUE_RAW  120.0      // เขียว = ดิบ
+#define HUE_RIPE  55.0      // เหลือง = สุก
+
+WebServer server(80);
+Adafruit_TCS34725 tcs(TCS34725_INTEGRATIONTIME_154MS, TCS34725_GAIN_4X);
+Preferences prefs;
+
+// ค่าคาลิเบรตสีขาว (เก็บลง NVS — ปิดเครื่องแล้วไม่ต้องคาลิเบรตใหม่)
+float wbR = 1.0, wbG = 1.0, wbB = 1.0;
+bool  calibrated = false;
+
+// ค่าที่วัดได้
+int   gR = 0, gG = 0, gB = 0;     // 0-255
+float gHue = 0;
+int   gRipe = 0;
+uint16_t gClear = 0;
+bool  gSensorOK = false;
+
+bool i2cAlive(uint8_t a) {
+  Wire.beginTransmission(a);
+  return (Wire.endTransmission() == 0);
+}
+
+uint8_t gamma8(float v) {
+  if (v < 0) v = 0;
+  if (v > 1) v = 1;
+  return (uint8_t)(pow(v, 2.2) * BRIGHT + 0.5);
+}
+
+float rgbToHue(float r, float g, float b) {
+  float mx = max(r, max(g, b)), mn = min(r, min(g, b)), d = mx - mn;
+  if (d < 0.0001) return 0;
+  float h;
+  if      (mx == r) h = 60.0 * fmod(((g - b) / d), 6.0);
+  else if (mx == g) h = 60.0 * (((b - r) / d) + 2.0);
+  else              h = 60.0 * (((r - g) / d) + 4.0);
+  if (h < 0) h += 360.0;
+  return h;
+}
+
+// ---------- คาลิเบรตสีขาว ----------
+void calibrateWhite() {
+  uint16_t r, g, b, c;
+  tcs.getRawData(&r, &g, &b, &c);
+  if (c == 0) return;
+
+  float rN = (float)r / c, gN = (float)g / c, bN = (float)b / c;
+  // ตอนจ่อขาว R,G,B ควรเท่ากัน --> หาตัวคูณที่ทำให้เท่ากัน
+  wbR = (rN > 0.001) ? (1.0 / 3.0) / rN : 1.0;
+  wbG = (gN > 0.001) ? (1.0 / 3.0) / gN : 1.0;
+  wbB = (bN > 0.001) ? (1.0 / 3.0) / bN : 1.0;
+  calibrated = true;
+
+  prefs.putFloat("wbR", wbR);
+  prefs.putFloat("wbG", wbG);
+  prefs.putFloat("wbB", wbB);
+  prefs.putBool("cal", true);
+
+  Serial.print(">>> คาลิเบรตสีขาวแล้ว  wb = ");
+  Serial.print(wbR, 2); Serial.print(" / ");
+  Serial.print(wbG, 2); Serial.print(" / ");
+  Serial.println(wbB, 2);
+
+  for (int i = 0; i < 2; i++) {
+    neopixelWrite(RGB_PIN, BRIGHT, BRIGHT, BRIGHT); delay(120);
+    neopixelWrite(RGB_PIN, 0, 0, 0);                delay(120);
+  }
+}
+
+// ---------- อ่านสี ----------
+void readColor() {
+  uint16_t r, g, b, c;
+  tcs.getRawData(&r, &g, &b, &c);
+  gClear = c;
+
+  float rN = 0, gN = 0, bN = 0;
+  if (c > 0) { rN = (float)r / c; gN = (float)g / c; bN = (float)b / c; }
+
+  float rC = rN * wbR, gC = gN * wbG, bC = bN * wbB;
+
+  // ขยายให้เต็มช่วง (ตัวแรงสุด = 1.0) เพื่อให้สีสดชัด
+  float mx = max(rC, max(gC, bC));
+  if (mx > 0.001) { rC /= mx; gC /= mx; bC /= mx; }
+
+  gR = (int)(rC * 255);
+  gG = (int)(gC * 255);
+  gB = (int)(bC * 255);
+
+  gHue = rgbToHue(rC, gC, bC);
+
+  float pct = (gHue - HUE_RIPE) / (HUE_RAW - HUE_RIPE) * 100.0;
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+  gRipe = 100 - (int)pct;
+
+  // ไฟบนบอร์ดโชว์สีเดียวกัน (ผ่าน gamma)
+  neopixelWrite(RGB_PIN, gamma8(rC), gamma8(gC), gamma8(bC));
+}
+
+// ---------- API ----------
+void handleData() {
+  char hex[8];
+  sprintf(hex, "#%02X%02X%02X", gR, gG, gB);
+
+  String j = "{";
+  j += "\"hex\":\"" + String(hex) + "\",";
+  j += "\"r\":"     + String(gR)  + ",";
+  j += "\"g\":"     + String(gG)  + ",";
+  j += "\"b\":"     + String(gB)  + ",";
+  j += "\"hue\":"   + String(gHue, 0)  + ",";
+  j += "\"ripe\":"  + String(gRipe)    + ",";
+  j += "\"clear\":" + String(gClear)   + ",";
+  j += "\"cal\":"   + String(calibrated ? "true" : "false") + ",";
+  j += "\"ok\":"    + String(gSensorOK ? "true" : "false")  + "}";
+  server.send(200, "application/json", j);
+}
+
+void handleCalib() {
+  calibrateWhite();
+  server.send(200, "text/plain", "ok");
+}
+
+void handleRoot() {
+  String html = F(
+  "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+  "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+  "<title>MangoBox Color</title><style>"
+  "*{box-sizing:border-box}"
+  "body{font-family:-apple-system,sans-serif;background:#14281d;color:#fff;"
+  "margin:0;padding:16px;text-align:center}"
+  "h1{color:#f4c430;margin:4px 0 14px;font-size:22px}"
+
+  /* แถบสีใหญ่ — พระเอกของหน้านี้ */
+  ".swatch{height:190px;border-radius:20px;margin:0 auto 8px;max-width:460px;"
+  "border:3px solid #2c4a34;display:flex;align-items:center;justify-content:center;"
+  "transition:background .25s}"
+  ".hex{font-size:30px;font-weight:800;font-family:monospace;"
+  "background:rgba(0,0,0,.45);padding:8px 18px;border-radius:12px;color:#fff}"
+
+  ".panel{background:#1e3527;border-radius:16px;padding:14px;margin:10px auto;max-width:460px}"
+  ".row{display:flex;align-items:center;gap:10px;margin:8px 0}"
+  ".tag{width:22px;font-weight:700;font-size:14px;text-align:left}"
+  ".track{flex:1;height:14px;background:#0d1a12;border-radius:7px;overflow:hidden}"
+  ".fill{height:100%;transition:width .25s}"
+  ".num{width:38px;font-size:13px;color:#9fb89f;text-align:right}"
+
+  ".grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:460px;margin:10px auto}"
+  ".card{background:#1e3527;border-radius:12px;padding:12px}"
+  ".v{font-size:24px;font-weight:800;color:#f4c430}"
+  ".l{font-size:11px;color:#9fb89f;margin-top:2px}"
+
+  "button{width:100%;max-width:460px;padding:15px;font-size:16px;font-weight:700;"
+  "border:0;border-radius:12px;background:#f4c430;color:#14281d;margin-top:6px}"
+  "button:active{background:#d9ad22}"
+  ".warn{color:#e57e25;font-size:13px;margin-top:8px;min-height:18px}"
+  "</style></head><body>"
+
+  "<h1>MangoBox — เซ็นเซอร์สี</h1>"
+  "<div class='swatch' id='sw'><div class='hex' id='hex'>--</div></div>"
+
+  "<div class='panel'>"
+  "<div class='row'><div class='tag' style='color:#ff6b6b'>R</div>"
+  "<div class='track'><div class='fill' id='fr' style='background:#ff6b6b;width:0%'></div></div>"
+  "<div class='num' id='nr'>0</div></div>"
+  "<div class='row'><div class='tag' style='color:#6bcf7f'>G</div>"
+  "<div class='track'><div class='fill' id='fg' style='background:#6bcf7f;width:0%'></div></div>"
+  "<div class='num' id='ng'>0</div></div>"
+  "<div class='row'><div class='tag' style='color:#6b9bff'>B</div>"
+  "<div class='track'><div class='fill' id='fb' style='background:#6b9bff;width:0%'></div></div>"
+  "<div class='num' id='nb'>0</div></div>"
+  "</div>"
+
+  "<div class='grid'>"
+  "<div class='card'><div class='v'><span id='hue'>--</span>&deg;</div>"
+  "<div class='l'>Hue (องศาสี)</div></div>"
+  "<div class='card'><div class='v'><span id='ripe'>--</span>%</div>"
+  "<div class='l'>ความสุกจากสี</div></div>"
+  "</div>"
+
+  "<button onclick='cal()'>จ่อกระดาษขาว แล้วกดปุ่มนี้ (คาลิเบรต)</button>"
+  "<div class='warn' id='warn'></div>"
+
+  "<script>"
+  "async function u(){try{"
+  "let d=await(await fetch('/data')).json();"
+  "sw.style.background=d.hex;"
+  "hex.textContent=d.hex;"
+  "fr.style.width=(d.r/255*100)+'%';nr.textContent=d.r;"
+  "fg.style.width=(d.g/255*100)+'%';ng.textContent=d.g;"
+  "fb.style.width=(d.b/255*100)+'%';nb.textContent=d.b;"
+  "hue.textContent=d.hue;ripe.textContent=d.ripe;"
+  "let w='';"
+  "if(!d.ok)w='ไม่พบเซ็นเซอร์! เช็กสาย';"
+  "else if(!d.cal)w='ยังไม่คาลิเบรต — สีจะเอียงแดง';"
+  "else if(d.clear<50)w='แสงน้อยเกินไป จ่อให้ใกล้ขึ้น';"
+  "else if(d.clear>60000)w='แสงจ้าเกินไป (อิ่มตัว)';"
+  "warn.textContent=w;"
+  "}catch(e){}}"
+  "async function cal(){await fetch('/calib');warn.textContent='คาลิเบรตแล้ว!';}"
+  "setInterval(u,300);u();"
+  "</script></body></html>");
+  server.send(200, "text/html", html);
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(BTN_PIN, INPUT_PULLUP);
+  Wire.begin(I2C_SDA, I2C_SCL);
+  Wire.setClock(50000);
+  delay(500);
+
+  if (i2cAlive(0x29)) { gSensorOK = tcs.begin(); Serial.println("[OK] TCS34725"); }
+  else Serial.println("[X] ไม่พบ TCS34725 (0x29) — เช็กสาย");
+
+  // โหลดค่าคาลิเบรตเดิม
+  prefs.begin("colorcal", false);
+  calibrated = prefs.getBool("cal", false);
+  if (calibrated) {
+    wbR = prefs.getFloat("wbR", 1.0);
+    wbG = prefs.getFloat("wbG", 1.0);
+    wbB = prefs.getFloat("wbB", 1.0);
+    Serial.println("[NVS] โหลดค่าคาลิเบรตเดิมแล้ว");
+  } else {
+    Serial.println("[!] ยังไม่เคยคาลิเบรต — จ่อกระดาษขาวแล้วกดปุ่ม BOOT (หรือกดบนมือถือ)");
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("กำลังเชื่อม WiFi");
+  int t = 0;
+  while (WiFi.status() != WL_CONNECTED && t < 20) { delay(500); Serial.print("."); t++; }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("\n[OK] เปิดมือถือเข้าเว็บนี้:  http://");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n[X] ต่อ WiFi ไม่ได้ — ต้องเป็น WiFi 2.4GHz เท่านั้น!");
+  }
+
+  server.on("/",      handleRoot);
+  server.on("/data",  handleData);
+  server.on("/calib", handleCalib);
+  server.begin();
+
+  Serial.println("\nR,G,B,HEX,Hue,Ripe");
+}
+
+void loop() {
+  server.handleClient();
+
+  // ปุ่ม BOOT บนบอร์ด = คาลิเบรต (ทางเลือกนอกจากกดบนมือถือ)
+  static bool prev = HIGH;
+  bool now = digitalRead(BTN_PIN);
+  if (prev == HIGH && now == LOW) {
+    delay(50);
+    if (digitalRead(BTN_PIN) == LOW) calibrateWhite();
+  }
+  prev = now;
+
+  static unsigned long last = 0;
+  if (millis() - last < 200) return;
+  last = millis();
+
+  if (!gSensorOK) return;
+  readColor();
+
+  Serial.print(gR);       Serial.print(',');
+  Serial.print(gG);       Serial.print(',');
+  Serial.print(gB);       Serial.print(",#");
+  if (gR < 16) Serial.print("0"); Serial.print(gR, HEX);
+  if (gG < 16) Serial.print("0"); Serial.print(gG, HEX);
+  if (gB < 16) Serial.print("0"); Serial.print(gB, HEX);
+  Serial.print(',');
+  Serial.print(gHue, 0);  Serial.print(',');
+  Serial.println(gRipe);
+}
